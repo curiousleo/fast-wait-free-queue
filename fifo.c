@@ -24,7 +24,7 @@ typedef fifo_request_t request_t;
 #define store(p, v) __atomic_store_n(p, v, __ATOMIC_RELEASE)
 #define load(p) __atomic_load_n(p, __ATOMIC_ACQUIRE)
 #define spin_while(cond) while (cond) __asm__ ("pause")
-#define fence() __asm__ ( "mfence" : : : "memory" );
+#define fence() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 #define release_fence() __atomic_thread_fence(__ATOMIC_RELEASE)
 #define lock(p) spin_while(__atomic_test_and_set(p, __ATOMIC_ACQUIRE))
 #define unlock(p) __atomic_clear(p, __ATOMIC_RELEASE)
@@ -48,40 +48,63 @@ node_t * new_node(size_t id, size_t size)
 }
 
 static __attribute__((noinline))
-node_t * cleanup(handle_t * plist, node_t * from, node_t * to)
+node_t * cleanup(handle_t * plist, handle_t * me, node_t * from, node_t * to)
 {
   size_t bar = to->id;
   size_t min = from->id;
 
   /** Scan plist to find the lowest bar. */
   handle_t * p;
+  int i;
 
   for (p = plist; p != NULL; p = p->next) {
-    int i;
-    for (i = 0; i < 3; ++i) {
-      node_t * node = p->node[i];
+    if (p == me) continue;
 
-      if (node->id < bar && p->hazard == NULL) {
-        node_t * prev = compare_and_swap(&p->node[i], node, to);
-        release_fence();
-        node_t * curr = load(&p->hazard);
+    node_t * hazard = p->hazard;
 
-        if (curr) {
-          node = curr;
-        } else {
-          if (prev == node) {
-            node = to;
-          } else {
-            node = prev;
-          }
-        }
+    if (hazard) {
+      if (hazard->id < bar) {
+        bar = hazard->id;
+
+        if (bar <= min) return from;
+        else to = hazard;
       }
 
-      if (node->id < bar) {
-        bar = node->id;
-        to = node;
+      for (i = 0; i < 3; ++i) {
+        node_t * node = p->node[i];
 
-        if (bar <= min) return to;
+        if (node->id < bar) {
+          bar = node->id;
+
+          if (bar <= min) return from;
+          else to = node;
+        }
+      }
+    } else {
+      for (i = 0; i < 3; ++i) {
+        node_t * node = p->node[i];
+
+        if (node->id < bar) {
+          node_t * prev = compare_and_swap(&p->node[i], node, to);
+          release_fence();
+          hazard = load(&p->hazard);
+
+          if (NULL == hazard && prev == node) continue;
+          else {
+            if (hazard) {
+              if (hazard->id < node->id) node = hazard;
+            } else {
+              if (prev->id < node->id) node = prev;
+            }
+          }
+
+          if (node->id < bar) {
+            bar = node->id;
+
+            if (bar <= min) return from;
+            else to = node;
+          }
+        }
       }
     }
   }
@@ -168,14 +191,22 @@ void release(fifo_t * fifo, handle_t * handle)
 
     if (head == load(&handle->node[2])) {
       /* Do nothing if we haven't reach threshold. */
-      if (node->id - head->id > threshold) {
-        node = cleanup(fifo->plist, head, node);
+      if (node->id > head->id && node->id - head->id > threshold) {
+        node = cleanup(fifo->plist, handle, head, node);
 
-        /** Free. */
-        while (head != node) {
-          node_t * next = head->next;
-          free(head);
-          head = next;
+        if (head != node) {
+          handle->node[2] = node;
+          store(&handle->hazard, NULL);
+
+          /** Free. */
+          do {
+            node_t * next = head->next;
+            free(head);
+            head = next;
+          } while (head != node);
+
+          handle->advanced = 0;
+          return;
         }
       }
     }

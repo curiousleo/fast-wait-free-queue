@@ -16,8 +16,8 @@ typedef struct {
 } fifo_t;
 
 typedef struct __attribute__((__packed__, aligned(64))) _fifo_handle_t {
-  struct _fifo_node_t * hazard __attribute__((aligned(64)));
-  struct _fifo_node_t * node[3];
+  struct _fifo_node_t * volatile hazard __attribute__((aligned(64)));
+  struct _fifo_node_t * volatile node[3];
   struct _fifo_handle_t * next __attribute__((aligned(64)));
   void * volatile * ptr;
   int advanced;
