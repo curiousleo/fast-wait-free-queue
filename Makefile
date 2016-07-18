@@ -34,7 +34,7 @@ ccqueue: CFLAGS += -DCCQUEUE
 msqueue: CFLAGS += -DMSQUEUE
 faa: CFLAGS += -DFAAQ
 delay: CFLAGS += -DDELAY
-dummy: CFLAGS += -DDUMMY
+dummy: CFLAGS += -DDUMMY -Lrust-dummy/target/debug -lrust_dummy
 
 $(TESTS): harness.o
 ifeq (${HALFHALF}, 1)

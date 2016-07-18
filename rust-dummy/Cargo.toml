@@ -1,0 +1,10 @@
+[package]
+name = "rust_dummy"
+version = "0.1.0"
+authors = ["Leonhard Markert <curiousleo@ymail.com>"]
+
+[dependencies]
+libc = "0.2.*"
+
+[lib]
+crate-type = ["dylib"]

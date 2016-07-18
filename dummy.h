@@ -3,6 +3,8 @@
 
 #ifdef DUMMY
 
+#include "align.h"
+
 #define EMPTY (void *) -1
 
 typedef int queue_t;
