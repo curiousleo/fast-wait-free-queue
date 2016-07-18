@@ -23,6 +23,9 @@ typedef struct {
 
 typedef int handle_t;
 
+#elif DUMMY
+#include "dummy.h"
+
 #elif DELAY
 
 typedef int queue_t;

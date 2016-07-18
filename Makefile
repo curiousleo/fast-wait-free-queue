@@ -1,4 +1,4 @@
-TESTS = wfqueue wfqueue0 lcrq ccqueue msqueue faa delay
+TESTS = wfqueue wfqueue0 lcrq ccqueue msqueue faa delay dummy
 
 CC = gcc
 CFLAGS = -g -Wall -O3 -pthread -D_GNU_SOURCE
@@ -34,6 +34,7 @@ ccqueue: CFLAGS += -DCCQUEUE
 msqueue: CFLAGS += -DMSQUEUE
 faa: CFLAGS += -DFAAQ
 delay: CFLAGS += -DDELAY
+dummy: CFLAGS += -DDUMMY
 
 $(TESTS): harness.o
 ifeq (${HALFHALF}, 1)
